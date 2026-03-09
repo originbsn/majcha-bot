@@ -8,7 +8,7 @@ app = Flask(__name__)
 client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
-VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "majcha2024")
+VERIFY_TOKEN = "majcha2024"
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8793240457:AAF1Zr0Aws7tdzM-H1VRHB5q3E9ufZBKaxU")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "5146262487")
 
