@@ -8,7 +8,7 @@ app = Flask(__name__)
 client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
-VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
+VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "majcha2024")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8793240457:AAF1Zr0Aws7tdzM-H1VRHB5q3E9ufZBKaxU")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "5146262487")
 
@@ -203,10 +203,13 @@ def get_ai_reply(user_id, user_text):
 
 @app.route('/webhook', methods=['GET'])
 def verify():
-    if request.args.get('hub.verify_token') == VERIFY_TOKEN:
-        return request.args.get('hub.challenge')
+    mode = request.args.get('hub.mode')
+    token = request.args.get('hub.verify_token')
+    challenge = request.args.get('hub.challenge')
+    if mode == 'subscribe' and token == VERIFY_TOKEN:
+        return challenge, 200
     return 'Forbidden', 403
-
+  
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
