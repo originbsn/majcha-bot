@@ -200,6 +200,7 @@ def get_ai_reply(user_id, user_text):
         return clean_reply
 
     return reply
+
 @app.route('/webhook', methods=['GET'])
 def verify():
     mode = request.args.get('hub.mode')
@@ -208,7 +209,8 @@ def verify():
     if mode == 'subscribe' and token == VERIFY_TOKEN:
         return challenge, 200
     return 'Forbidden', 403
-  @app.route('/webhook', methods=['POST'])
+
+@app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
     for entry in data.get('entry', []):
