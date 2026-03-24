@@ -7,7 +7,9 @@ from flask import Flask, request, jsonify
 from anthropic import Anthropic
 
 app = Flask(__name__)
-client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+import httpx
+http_client = httpx.Client(timeout=30.0)
+client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], http_client=http_client)
 
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
 VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
