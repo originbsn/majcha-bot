@@ -3,6 +3,7 @@ import re
 import math
 import time
 import requests
+import threading
 from flask import Flask, request, jsonify
 from anthropic import Anthropic
 
@@ -328,6 +329,16 @@ def webhook():
 def health():
     return jsonify({"status": "ok", "sessions": len(user_sessions)}), 200
 
+def self_ping():
+    import time as t
+    while True:
+        t.sleep(300)
+        try:
+            requests.get('https://majcha-bot-1.onrender.com/health', timeout=10)
+        except:
+            pass
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    threading.Thread(target=self_ping, daemon=True).start()
     app.run(host='0.0.0.0', port=port)
