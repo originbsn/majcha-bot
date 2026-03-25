@@ -257,6 +257,18 @@ def verify():
         return request.args.get('hub.challenge')
     return 'Forbidden', 403
 
+def reply_to_comment(comment_id, message):
+    url = f"https://graph.facebook.com/v18.0/{comment_id}/comments"
+    try:
+        resp = requests.post(url, json={
+            "message": message,
+            "access_token": PAGE_ACCESS_TOKEN
+        }, timeout=5)
+        if not resp.ok:
+            print(f"Comment reply error: {resp.status_code} {resp.text}")
+    except Exception as e:
+        print(f"Comment reply exception: {e}")
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
@@ -265,32 +277,51 @@ def webhook():
             return 'OK', 200
 
         for entry in data.get('entry', []):
+            # handle DM
             for event in entry.get('messaging', []):
                 try:
                     sender_id = event.get('sender', {}).get('id')
                     if not sender_id:
                         continue
-
-                    # ตอบแค่ message จริง — ข้าม delivery/read receipts
                     msg = event.get('message', {})
                     if not msg or msg.get('is_echo'):
                         continue
-
                     user_text = msg.get('text', '').strip()
                     if not user_text:
                         continue
-
                     reply = get_ai_reply(sender_id, user_text)
                     send_message_fb(sender_id, reply)
-
                 except Exception as e:
                     print(f"Event processing error: {e}")
+                    continue
+
+            # handle comments
+            for change in entry.get('changes', []):
+                try:
+                    value = change.get('value', {})
+                    if change.get('field') != 'feed':
+                        continue
+                    if value.get('item') != 'comment':
+                        continue
+                    if value.get('verb') != 'add':
+                        continue
+                    # ข้าม comment ของเพจเอง
+                    if value.get('from', {}).get('id') == entry.get('id'):
+                        continue
+                    comment_id = value.get('comment_id')
+                    comment_text = value.get('message', '').strip()
+                    commenter_id = value.get('from', {}).get('id', 'unknown')
+                    if not comment_id or not comment_text:
+                        continue
+                    reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
+                    reply_to_comment(comment_id, reply)
+                except Exception as e:
+                    print(f"Comment processing error: {e}")
                     continue
 
     except Exception as e:
         print(f"Webhook error: {e}")
 
-    # ต้อง return 200 เสมอ ไม่งั้น Facebook retry วนซ้ำ
     return 'OK', 200
 
 @app.route('/health', methods=['GET'])
