@@ -8,6 +8,18 @@ from flask import Flask, request, jsonify
 from anthropic import Anthropic
 
 app = Flask(__name__)
+
+def self_ping():
+    import time as t
+    t.sleep(60)
+    while True:
+        try:
+            requests.get('https://majcha-bot-1.onrender.com/health', timeout=10)
+        except:
+            pass
+        t.sleep(270)
+
+threading.Thread(target=self_ping, daemon=True).start()
 import httpx
 http_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=30.0))
 client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], base_url="https://restless-snow-9839.iiceeciibg.workers.dev", http_client=http_client)
@@ -329,16 +341,6 @@ def webhook():
 def health():
     return jsonify({"status": "ok", "sessions": len(user_sessions)}), 200
 
-def self_ping():
-    import time as t
-    while True:
-        t.sleep(300)
-        try:
-            requests.get('https://majcha-bot-1.onrender.com/health', timeout=10)
-        except:
-            pass
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    threading.Thread(target=self_ping, daemon=True).start()
     app.run(host='0.0.0.0', port=port)
