@@ -393,7 +393,7 @@ def get_ai_reply(user_id, user_text):
         reply = response.content[0].text
     except Exception as e:
         print(f"Claude API error: {e}")
-        return "ขอโทษนะคะ ตอนนี้ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้งได้เลยค่ะ 🙏"
+        return "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
 
     session["history"].append({"role": "assistant", "content": reply})
 
