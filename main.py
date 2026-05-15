@@ -29,6 +29,40 @@ VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
+# ========== PROMOTION ==========
+PROMO_IMAGE_URL = "https://i.ibb.co/MkLtBJ6g/Screenshot-2026-05-15-at-11-40-05-AM.png"
+
+PROMO_KEYWORDS = [
+    'โปร', 'โปรโมชั่น', 'promotion', 'set', 'เซ็ต', 'ชุด', 'premium', 'พรีเมียม',
+    'ส่วนลด', 'discount', 'ราคาพิเศษ', '999', '1199', '1990'
+]
+
+PROMO_DETAIL = """
+โปรโมชั่น PREMIUM SET ร้านมัจฉา ปลาจุ่ม:
+- ทุกชุดได้ปลาจุ่มปลากะพง + น้ำซุปสูตร 30 ปี + ชุดผัก + น้ำจิ้ม
+
+▪️ SET 999 บาท (เหมาะ 2-3 ท่าน)
+  • ปลาจุ่ม 1 ชุด
+  • เมนูทานเล่น (STEP 2) เลือกได้ 2 เมนู
+  • เมนูผัด/ทอด (STEP 3) เลือกได้ 2 เมนู
+
+▪️ SET 1,199 บาท (เหมาะ 3-4 ท่าน)
+  • ปลาจุ่ม 1 ชุด
+  • เมนูทานเล่น (STEP 2) เลือกได้ 1 เมนู
+  • เมนูผัด/ทอด (STEP 3) เลือกได้ 1 เมนู
+  • เมนูยำ/ต้ม (STEP 4) เลือกได้ 1 เมนู
+  • เมนู Premium (STEP 5) เลือกได้ 1 เมนู
+
+▪️ SET 1,990 บาท (เหมาะ 4-6 ท่าน)
+  • ปลาจุ่ม 2 ชุด
+  • เมนูทานเล่น (STEP 2) เลือกได้ 1 เมนู
+  • เมนูผัด/ทอด (STEP 3) เลือกได้ 1 เมนู
+  • เมนูยำ/ต้ม (STEP 4) เลือกได้ 2 เมนู
+  • เมนู Premium (STEP 5) เลือกได้ 2 เมนู
+
+หมายเหตุ: ถ้าลูกค้าถามรายละเอียดเพิ่มเติมที่ไม่รู้ ให้ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
+"""
+
 KNOWLEDGE_BASE = """
 ร้านมัจฉา ปลาจุ่ม:
 เวลาเปิด: 11:00-22:00 น. | หยุด: วันจันทร์
@@ -42,6 +76,7 @@ Google Maps: https://maps.app.goo.gl/ZY884ugFrGCJXmoD6
 
 โปรโมชั่นพิเศษ:
 - โปรวันเกิด: ลด 10% (ต้องแจ้งล่วงหน้าและแสดงหลักฐานวันเกิด)
+- PREMIUM SET: เริ่ม 999 บาท (ดูรายละเอียดใน PROMO_DETAIL)
 
 เมนูแนะนำ ★: ปลาจุ่มปลาช่อน 279 | ปลาจุ่มปลากะพง 399 | ไก่ผัดมะม่วงหิมพานต์ 169 | ปลาหมึกผัดไข่เค็ม 189 | ปลากะพงทอดน้ำปลา 399 | ผัดผักโขมห่อไข่เค็มเบรกแตก 129
 เมนูลิงก์: https://canva.link/8vshw4aq9lahpgk
@@ -189,7 +224,6 @@ MENU_FULL = """
 """
 
 # ========== PROMPTS ==========
-# สำคัญ: ทั้ง 2 prompt มี KNOWLEDGE_BASE ครบ เพื่อป้องกัน hallucinate ข้อมูลพื้นฐาน
 
 GENERAL_PROMPT = f"""คุณคือแอดมินร้าน "มัจฉา ปลาจุ่ม" ตอบแชท Facebook แบบคนพิมจริงๆ
 
@@ -202,13 +236,17 @@ GENERAL_PROMPT = f"""คุณคือแอดมินร้าน "มัจ
 - ถ้าถามที่อยู่/เส้นทาง/จอดรถ: บอกสั้นๆ + Maps link แล้วถามว่า "จะจองโต๊ะไว้ก่อนได้เลยนะคะเดี๋ยวมาถึงที่เต็มก่อน มากี่ท่านคะ?"
 - ถ้าถามราคา/เมนูใดเมนูหนึ่ง: ตอบราคาแล้วถามต่อว่า "จองโต๊ะไว้ก่อนได้เลยนะคะ 😊"
 - ถ้าถามเวลาเปิด/ปิด/วันหยุด: ตอบแล้วถามว่า "จะมาช่วงไหนคะ? จองไว้ก่อนได้เลยนะคะ"
-- ถ้าถามโปร/ส่วนลด: มีโปรวันเกิดลด 10%
+- ถ้าถามโปร/ส่วนลด/โปรโมชั่น/set/เซ็ต/premium: ตอบข้อมูลโปร PREMIUM SET แบบสั้นๆ ชัดๆ แล้วถามว่า "สนใจ set ไหนคะ? จองไว้ก่อนได้เลยนะคะ 😊" (รูปจะถูกส่งโดย system อัตโนมัติ ไม่ต้องพูดถึงรูป)
+- ถ้าลูกค้าถามรายละเอียดโปรที่ไม่รู้: ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
 - ถ้าลูกค้าบอกว่าจะมากิน/อยากมาทาน: ถามว่าจะจองโต๊ะไว้ก่อนมั้ยคะ
 - ถ้าถามส่งบ้าน: ทางร้านไม่มีบริการส่ง แนะนำ Grab Food หรือให้มารับได้เลยค่ะ
 - ถ้าไม่รู้/ไม่มีข้อมูล: บอกว่าไม่แน่ใจค่ะ แล้วให้โทรถามได้เลยที่ 052-005-581 หรือ 081-751-4044 นะคะ
 - ถ้าลูกค้าถามว่า วันนี้เปิดมั้ย,ไหม ให้ตอบไปว่า ร้านเปิดทุกวัน 11.00-22.00 หยุดวันจันทร์ ห้ามถามลูกค้ากลับว่าวันนี้วันอะไรให้ลูกค้าตอบ
-- ห้ามให้เบอร์โทรร้านโดยเด็ดขาด ยกเว้นลูกค้าถามเองว่าโทรได้มั้ย หรือเข้ากรณีไม่รู้จริงๆ
+- ห้ามให้เบอร์โทรร้านโดยเด็ดขาด ยกเว้นลูกค้าถามเองว่าโทรได้มั้ย หรือเข้ากรณีไม่รู้จริงๆ หรือกรณีถามรายละเอียดโปรเพิ่มเติม
 - ตอบภาษาเดียวกับที่ลูกค้าใช้ ถ้าลูกค้าพิมไทยตอบไทย ถ้าพิมอังกฤษตอบอังกฤษ
+
+ข้อมูลโปรโมชั่น PREMIUM SET:
+{PROMO_DETAIL}
 
 ข้อมูลร้าน:
 {KNOWLEDGE_BASE}
@@ -226,11 +264,12 @@ BOOKING_PROMPT = f"""คุณคือแอดมินร้าน "มัจ
 - โปรวันเกิด: ลด 10% ต้องแจ้งล่วงหน้าและแสดงหลักฐานวันเกิด
 - ถ้ามีโปร ให้หัก 10% ก่อนคำนวณยอดรวมเสมอ
 - ลูกค้าสามารถนำเครื่องดื่นแอลกอฮอเข้ามาได้ เบียร์ ไวน์ เหล้า นำเข้ามาได้ไม่เสียค่าเปิดขวด ฟรี
+- ถ้าลูกค้าถามรายละเอียดโปรที่ไม่รู้: ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
 
 กฎการเขียน:
 - ถ้าแสดงรายการเมนู: ใช้ • นำหน้าแต่ละรายการ ขึ้นบรรทัดใหม่ทีละเมนู
 - พิมสั้น เป็นกันเอง emoji 1 ตัว ห้ามใช้ **bold**
-- ห้ามบอกให้โทรยืนยัน ห้ามบอกเบอร์โทรร้าน
+- ห้ามบอกให้โทรยืนยัน ห้ามบอกเบอร์โทรร้าน ยกเว้นถามรายละเอียดโปรเพิ่มเติม
 - ถ้าไม่บอกวัน = วันนี้ ห้ามถามวันซ้ำ
 - ตอบภาษาเดียวกับที่ลูกค้าใช้ ถ้าลูกค้าพิมไทยตอบไทย ถ้าพิมอังกฤษตอบอังกฤษ
 
@@ -251,6 +290,9 @@ BOOKING_PROMPT = f"""คุณคือแอดมินร้าน "มัจ
 ขั้น 2: กี่ท่าน (ถ้าบอกแล้ว ข้าม)
 ขั้น 3: ขอชื่อและเบอร์ ปิดด้วย [BOOKING_COMPLETE]
 
+ข้อมูลโปรโมชั่น PREMIUM SET:
+{PROMO_DETAIL}
+
 ราคาเมนูทั้งหมด:
 {MENU_FULL}
 
@@ -258,11 +300,10 @@ BOOKING_PROMPT = f"""คุณคือแอดมินร้าน "มัจ
 {KNOWLEDGE_BASE}
 """
 
-# Session storage พร้อม TTL 24 ชม.
-SESSION_TTL = 2 * 60 * 60 
+# ========== SESSION ==========
+SESSION_TTL = 2 * 60 * 60
 user_sessions = {}
 
-# Booking keywords — เฉพาะ intent จองจริงๆ เอา trigger ที่ false positive ออก
 BOOKING_KEYWORDS = [
     'จอง','จองโต๊ะ','จองที่','book','reserve','ขอจอง','อยากจอง',
     'สั่งล่วงหน้า','สั่งอาหารล่วงหน้า','preorder','pre-order','ล่วงหน้า',
@@ -273,6 +314,9 @@ BOOKING_KEYWORDS = [
 
 def is_booking_intent(text):
     return any(k in text for k in BOOKING_KEYWORDS)
+
+def is_promo_intent(text):
+    return any(k in text for k in PROMO_KEYWORDS)
 
 def get_session(user_id):
     now = time.time()
@@ -285,6 +329,7 @@ def get_session(user_id):
         user_sessions[user_id]["last_active"] = now
     return user_sessions[user_id]
 
+# ========== TELEGRAM ==========
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     try:
@@ -362,6 +407,7 @@ def build_telegram_summary(history, is_deposit):
 
     return '\n'.join(lines)
 
+# ========== FACEBOOK ==========
 def send_message_fb(recipient_id, text):
     url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     try:
@@ -374,8 +420,32 @@ def send_message_fb(recipient_id, text):
     except Exception as e:
         print(f"FB send exception: {e}")
 
+def send_image_fb(recipient_id, image_url):
+    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    try:
+        resp = requests.post(url, json={
+            "recipient": {"id": recipient_id},
+            "message": {
+                "attachment": {
+                    "type": "image",
+                    "payload": {
+                        "url": image_url,
+                        "is_reusable": True
+                    }
+                }
+            }
+        }, timeout=5)
+        if not resp.ok:
+            print(f"FB image send error: {resp.status_code} {resp.text}")
+    except Exception as e:
+        print(f"FB image send exception: {e}")
+
+# ========== AI REPLY ==========
 def get_ai_reply(user_id, user_text):
     session = get_session(user_id)
+
+    # ส่งรูปโปรก่อนเลย ถ้า detect ได้ — แยก DM กับ comment (comment ส่งรูปไม่ได้)
+    send_promo_image = is_promo_intent(user_text) and not user_id.startswith("comment_")
 
     if not session["booking_mode"] and is_booking_intent(user_text):
         session["booking_mode"] = True
@@ -393,7 +463,7 @@ def get_ai_reply(user_id, user_text):
         reply = response.content[0].text
     except Exception as e:
         print(f"Claude API error: {e}")
-        return "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
+        return None, "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
 
     session["history"].append({"role": "assistant", "content": reply})
 
@@ -405,10 +475,11 @@ def get_ai_reply(user_id, user_text):
         summary = build_telegram_summary(session["history"], is_deposit)
         send_telegram(summary)
         session["booking_mode"] = False
-        return clean_reply
+        return send_promo_image, clean_reply
 
-    return reply
+    return send_promo_image, reply
 
+# ========== WEBHOOK ==========
 @app.route('/webhook', methods=['GET'])
 def verify():
     if request.args.get('hub.verify_token') == VERIFY_TOKEN:
@@ -447,7 +518,9 @@ def webhook():
                     user_text = msg.get('text', '').strip()
                     if not user_text:
                         continue
-                    reply = get_ai_reply(sender_id, user_text)
+                    should_send_image, reply = get_ai_reply(sender_id, user_text)
+                    if should_send_image:
+                        send_image_fb(sender_id, PROMO_IMAGE_URL)
                     send_message_fb(sender_id, reply)
                 except Exception as e:
                     print(f"Event processing error: {e}")
@@ -470,7 +543,7 @@ def webhook():
                     commenter_id = value.get('from', {}).get('id', 'unknown')
                     if not comment_id or not comment_text:
                         continue
-                    reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
+                    _, reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
                     reply_to_comment(comment_id, reply)
                 except Exception as e:
                     print(f"Comment processing error: {e}")
