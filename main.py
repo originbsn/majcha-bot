@@ -326,9 +326,9 @@ def is_booking_intent(text):
 def is_promo_intent(text):
     return any(k in text for k in PROMO_KEYWORDS)
 
-def _session(user_id):
+def get_session(user_id):
     now = time.time()
-    expired = [uid for uid, s in user_sessions.items() if now - s.("last_active", 0) > SESSION_TTL]
+    expired = [uid for uid, s in user_sessions.items() if now - s.get("last_active", 0) > SESSION_TTL]
     for uid in expired:
         del user_sessions[uid]
     if user_id not in user_sessions:
@@ -449,7 +449,7 @@ def send_image_fb(recipient_id, image_url):
         print(f"FB image send exception: {e}")
 
 # ========== AI REPLY ==========
-def _ai_reply(user_id, user_text):
+def get_ai_reply(user_id, user_text):
     session = get_session(user_id)
 
     # ส่งรูปโปรก่อนเลย ถ้า detect ได้ — แยก DM กับ comment (comment ส่งรูปไม่ได้)
@@ -472,6 +472,7 @@ def _ai_reply(user_id, user_text):
     except Exception as e:
         print(f"Claude API error: {e}")
         return None, "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
+
     session["history"].append({"role": "assistant", "content": reply})
 
     is_deposit = '[BOOKING_COMPLETE_DEPOSIT]' in reply
