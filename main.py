@@ -472,7 +472,6 @@ def _ai_reply(user_id, user_text):
     except Exception as e:
         print(f"Claude API error: {e}")
         return None, "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
-
     session["history"].append({"role": "assistant", "content": reply})
 
     is_deposit = '[BOOKING_COMPLETE_DEPOSIT]' in reply
