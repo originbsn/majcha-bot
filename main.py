@@ -7,6 +7,8 @@ import threading
 from flask import Flask, request, jsonify
 from anthropic import Anthropic
 
+import content
+
 app = Flask(__name__)
 
 def self_ping():
@@ -24,273 +26,42 @@ import httpx
 http_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=30.0))
 client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], base_url="https://restless-snow-9839.iiceeciibg.workers.dev", http_client=http_client)
 
+MODEL = "claude-sonnet-5-5"
+GRAPH_API = os.environ.get("GRAPH_API_VERSION", "v23.0")
+
 PAGE_ACCESS_TOKEN = os.environ["PAGE_ACCESS_TOKEN"]
 VERIFY_TOKEN = os.environ["VERIFY_TOKEN"]
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
-# ========== PROMOTION ==========
-PROMO_IMAGE_URL = "https://i.ibb.co/MkLtBJ6g/Screenshot-2026-05-15-at-11-40-05-AM.png"
-
-PROMO_KEYWORDS = [
-    'โปร', 'โปรโมชั่น', 'promotion', 'set', 'เซ็ต', 'ชุด', 'premium', 'พรีเมียม',
-    'ส่วนลด', 'discount', 'ราคาพิเศษ', '999', '1199', '1990', 'คนละครึ่ง', 'ไทยช่วยไทย'
-]
-
-PROMO_DETAIL = """
-โปรโมชั่น PREMIUM SET ร้านมัจฉา ปลาจุ่ม:
-- ทุกชุดได้ปลาจุ่มปลากะพง + น้ำซุปสูตร 30 ปี + ชุดผัก + น้ำจิ้ม
-
-▪️ SET 999 บาท (เหมาะ 2-3 ท่าน)
-  • ปลาจุ่ม 1 ชุด
-  • เมนูทานเล่น (STEP 2) เลือกได้ 2 เมนู
-  • เมนูผัด/ทอด (STEP 3) เลือกได้ 2 เมนู
-
-▪️ SET 1,199 บาท (เหมาะ 3-4 ท่าน)
-  • ปลาจุ่ม 1 ชุด
-  • เมนูทานเล่น (STEP 2) เลือกได้ 1 เมนู
-  • เมนูผัด/ทอด (STEP 3) เลือกได้ 1 เมนู
-  • เมนูยำ/ต้ม (STEP 4) เลือกได้ 1 เมนู
-  • เมนู Premium (STEP 5) เลือกได้ 1 เมนู
-
-▪️ SET 1,990 บาท (เหมาะ 4-6 ท่าน)
-  • ปลาจุ่ม 2 ชุด
-  • เมนูทานเล่น (STEP 2) เลือกได้ 1 เมนู
-  • เมนูผัด/ทอด (STEP 3) เลือกได้ 1 เมนู
-  • เมนูยำ/ต้ม (STEP 4) เลือกได้ 2 เมนู
-  • เมนู Premium (STEP 5) เลือกได้ 2 เมนู
-
-โปรโมชั่นคนละครึ่ง / ไทยช่วยไทย:
-- ร้านรับชำระผ่านแอปเป๋าตังและบัตรสวัสดิการแห่งรัฐ
-- ใช้ได้ตามเงื่อนไขโครงการรัฐบาล
-- สอบถามเพิ่มเติม โทร 081-7514044 ค่ะ
-
-หมายเหตุ: ถ้าลูกค้าถามรายละเอียดเพิ่มเติมที่ไม่รู้ ให้ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
-"""
-
-KNOWLEDGE_BASE = """
-ร้านมัจฉา ปลาจุ่ม:
-เวลาเปิด: 11:00-22:00 น. | หยุด: วันจันทร์
-ที่ตั้ง: ระหว่างกาดมีโชค-เซ็นทรัลเฟสติวัล เชียงใหม่ แถวรวมโชค ติดถนนใหญ่
-โทร: 052-005-581 หรือ 081-751-4044
-บริการ: ทานที่ร้าน Takeout Delivery จองโต๊ะล่วงหน้า
-ไม่มีบริการส่งถึงบ้าน ถ้าต้องการส่งให้เรียก Grab Food หรือ Grab Delivery มารับเอง
-Google Maps: https://maps.app.goo.gl/ZY884ugFrGCJXmoD6
-ที่จอดรถ: จอดข้างทางหน้าร้านได้เลย หรือจอดด้านหลังแล้วเดินทะลุตรง 7-11 ข้างร้าน
-รีวิว: https://www.google.com/maps/place/มัจฉา+ปลาจุ่ม
-ห้องส่วนตัว: มีค่ะ อยู่ชั้น 2 จุได้ 6-8 ท่าน (แนะนำจองล่วงหน้านะคะ)
-
-โปรโมชั่นพิเศษ:
-- โปรวันเกิด: ลด 10% (ต้องแจ้งล่วงหน้าและแสดงหลักฐานวันเกิด)
-- PREMIUM SET: เริ่ม 999 บาท (ดูรายละเอียดใน PROMO_DETAIL)
-- ไทยช่วยไทย คนละครึ่ง
-
-เมนูแนะนำ ★: ปลาจุ่มปลาช่อน 279 | ปลาจุ่มปลากะพง 399 | ไก่ผัดมะม่วงหิมพานต์ 169 | ปลาหมึกผัดไข่เค็ม 189 | ปลากะพงทอดน้ำปลา 399 | ผัดผักโขมห่อไข่เค็มเบรกแตก 129
-เมนูลิงก์: https://canva.link/8vshw4aq9lahpgk
-"""
-
-MENU_FULL = """
-**เมนูแนะนำ**
-- ปลาจุ่มซิกเนเจอร์-ปลาช่อน — 279
-- ปลาจุ่มพรีเมียม-ปลากะพง — 399
-- ไก่ผัดมะม่วงหิมพานต์ — 169
-- ปลาหมึกผัดไข่เค็ม — 189
-- ปลากะพงทอดน้ำปลา — 399
-- ผัดผักโขมห่อไข่เค็มเบรกแตก — 129
-
-**เมนูผัด**
-- ผัดพริกแกงปลาหมึก — 189
-- ผัดพริกแกงกุ้ง — 189
-- ปลาเกาผัดฉ่า — 299
-- เห็ดสามอย่างกระเทียมโทนในน้ำมันงาไทย — 149
-- ปลากะพงผัดฉ่า — 399
-- ปลาช่อนผัดฉ่า — 299
-- ยอดมะระผัดไข่ทรงเครื่อง — 149
-- หน่อไม้ฝรั่งผัดกุ้ง — 169
-- หมี่ผัดกระเฉดแบบโบราณ — 169
-- หมูผัดพริกไทยดำ — 159
-- เนื้อผัดพริกไทยดำ — 189
-- ปูก้อนผัดใบโหระพา — 289
-- ถั่วลันเตาผัดกุ้ง — 169
-- กุ้งคั่วพริกเกลือ — 259
-- เขียวหวานคั่วกลิ้งกุ้ง — 259
-
-**เมนูนึ่ง**
-- ปลากะพงนึ่งซีอิ๊ว — 399
-- แป๊ะซะปลาช่อน — 299
-- แป๊ะซะปลากะพง — 399
-
-**เมนูทอด**
-- ปีกไก่ทอดน้ำปลา — 189
-- หมูทอดกระเทียม — 169
-- ปลากะพงราดพริก — 399
-- ปลากะพงทอดกระเทียม — 399
-- ปลาช่อนราดพริก — 299
-- ปลาช่อนทอดกระเทียม — 299
-- ปีกไก่ยัดไส้สมุนไพรทอดกรอบ — 159
-- ไข่เจียวปูก้อน — 349
-- ไข่เจียว — 89
-- ไข่เจียวหมูสับ — 109
-- ไข่เจียวปู — 189
-- หมูสามชั้นทอดงาขาวราดซอสมะขาม — 169
-- กุ้งแม่น้ำทอดราดซอสมะขาม — 259
-- ซี่โครงหมูทอดเคลือบน้ำปลากวนผักชีทอดกรอบ — 169
-- หมูทอดนมสด — 139
-
-**เมนูต้ม-แกง**
-- ต้มยำกุ้งแม่น้ำน้ำใส — 299
-- ต้มยำกุ้งแม่น้ำน้ำใสหม้อใหญ่ — 399
-- ต้มยำกุ้งแม่น้ำน้ำข้น — 299
-- ต้มยำกุ้งแม่น้ำน้ำข้นหม้อใหญ่ — 399
-- ต้มยำรวมมิตรทะเล — 299
-- โป๊ะแตก — 299
-- แกงเขียวหวานลูกชิ้นปลากรายใบมะกรูด — 189
-- แกงเขียวหวานเนื้อน่องลาย — 259
-- ต้มข่าหัวปลีมะพร้าวอ่อน — 149
-- ต้มจืดไข่เจียวหมูสับ — 159
-- ต้มจืดสาหร่ายลูกชิ้นปลา — 139
-- แกงส้มชะอมทอดใส่กุ้ง — 259
-- หมึกน้ำดำ — 399
-
-**อาหารทานเล่น**
-- กุ้งแช่น้ำปลา — 189
-- เต้าหู้ปลาไส้กุ้งทอด — 169
-- ทอดมันปลา + ปูทอด — 169
-- ทอดมันปลา + กุ้งทอด — 169
-- ทอดมันปลาอินทรีย์ล้วน — 169
-- ทอดมันปลาหมึก — 169
-- กุ้งชุปแป้งทอด — 159
-- เกี๊ยวปลาโบราณ — 169
-- หมึกไข่แดดเดียว — 189
-- เต้าหู้ไส้ปลาหมึกทอด — 139
-- ปอเปี๊ยะเห็ดหอม — 149
-- จ๊อปู — 169
-- เฟรนช์ฟรายส์ทอด — 89
-- ทอดมันกุ้งโดนัท — 169
-- ถุงทองกุ้ง — 169
-- ปอเปี๊ยะกุ้ง — 189
-
-**เมนูยำ**
-- ยำตะไคร้สองกุ้งน้ำพริก — 169
-- ยำตะไคร้กุ้งแห้งมะพร้าวคั่ว — 129
-- ยำทะเลแตก — 189
-- ยำวุ้นเส้นสูตรโบราณ — 149
-- ยำหัวปลีไข่เค็ม — 129
-- ยำส้มโอโบราณ — 129
-- ยำปลาทูใส่ถั่วพลู — 129
-
-**อาหารจานเดียว**
-- ข้าวผัดโบราณหมู/ไก่ — 89
-- ข้าวผัดเขียวหวานหมู/ไก่ — 89
-- ข้าวผัดเขียวหวานเนื้อ — 129
-- ข้าวผัดเขียวหวานกุ้ง — 139
-- ข้าวผัดกุ้ง/ปู — 129
-- ข้าวผัดพริกแกงไก่ — 98
-- ข้าวราดกะเพราหมู — 89
-- ข้าวราดกระเพราปลาหมึก — 119
-- ข้าวราดกะเพรากุ้ง — 129
-- ข้าวหมูกระเทียม — 89
-- ก๋วยเตี๋ยวคั่วไก่ — 89
-- ผัดไทยกุ้งสด — 99
-- วุ้นเส้นผัดไทยกุ้งสด — 99
-- ราดหน้าเส้นใหญ่หมูหมัก — 99
-- ราดหน้าหมี่ขาวหมูหมัก — 99
-- ผัดซีอิ๋วหมูหมักเส้นใหญ่ — 89
-- ข้าวผัดพริกแกงทะเล — 139
-- ข้าวราดพริกแกงหมู/ไก่ — 98
-
-**ของหวาน**
-- กล้วยไข่บวชชี — 79
-- บัวลอยสามสี — 69
-- ทับทิมกรอบมะพร้าวอ่อน — 79
-- เต้าทึงร้อน — 69
-- บัวลอยน้ำขิง — 79
-- บัวลอยเผือก — 69
-- สาคูถั่วดำมะพร้าวอ่อน — 79
-
-**เครื่องดื่ม**
-- น้ำเก๊กฮวย — 59
-- น้ำตะไคร้หอม — 59
-- น้ำอัญชันมะนาว — 59
-- น้ำมะตูม — 59
-- น้ำลำไย — 59
-- น้ำกระเจี๊ยบ — 59
-- น้ำเสาวรส — 59
-- น้ำมะนาวน้ำผึ้ง — 59
-- น้ำมะขาม — 59
-- โค้ก/โค้กซีโร่ — 20
-- รีเจนซี่ — 490
-- เบียร์ไฮเนเก้น — 110
-- เบียร์สิงห์ — 100
-- เบียร์ช้าง — 85
-- เบียร์ลีโอ — 90
-- โซดา — 20
-- น้ำเปล่า — 15
-- น้ำแข็งเล็ก — 20
-- น้ำแข็งใหญ่ — 30
-"""
-
-# ========== PROMPTS ==========
-
-GENERAL_PROMPT = f"""คุณคือแอดมินร้าน "มัจฉา ปลาจุ่ม" ตอบแชท Facebook แบบคนพิมจริงๆ
-
-กฎ:
-- ตอบสั้น 1-2 ประโยคเท่านั้น
-- ถ้าแสดงรายการเมนู: ใช้ • นำหน้าแต่ละรายการ ขึ้นบรรทัดใหม่ทีละเมนู ลงท้ายด้วย https://canva.link/8vshw4aq9lahpgk เมนู
-- ถ้าลูกค้าถามเมนู ให้นำเมนูอย่างละ 2-3 อย่างในแต่ละหมวดหมู่โดยไม่ต้องให้เมนูของหวานและน้ำ และปิดท้ายด้วย https://canva.link/8vshw4aq9lahpgk ดูเมนูทั้งหมด
-- emoji แค่ 1 ตัว ลงท้าย ค่ะ หรือ นะคะ
-- ถ้าขอดูเมนู: ส่ง link เมนู แล้วถามว่า "สนใจจองเลยมั้ยคะ ช่วงเย็นคนจะแน่นนิดนึงค่ะ?"
-- ถ้าถามที่อยู่/เส้นทาง/จอดรถ: บอกสั้นๆ + Maps link แล้วถามว่า "จะจองโต๊ะไว้ก่อนได้เลยนะคะเดี๋ยวมาถึงที่เต็มก่อน มากี่ท่านคะ?"
-- ถ้าถามราคา/เมนูใดเมนูหนึ่ง: ตอบราคาแล้วถามต่อว่า "จองโต๊ะไว้ก่อนได้เลยนะคะ 😊"
-- ถ้าถามเวลาเปิด/ปิด/วันหยุด: ตอบแล้วถามว่า "จะมาช่วงไหนคะ? จองไว้ก่อนได้เลยนะคะ"
-- ถ้าถามโปร/ส่วนลด/โปรโมชั่น/set/เซ็ต/premium: ตอบข้อมูลโปร PREMIUM SET แบบสั้นๆ ชัดๆ แล้วถามว่า "สนใจ set ไหนคะ? จองไว้ก่อนได้เลยนะคะ 😊" (รูปจะถูกส่งโดย system อัตโนมัติ ไม่ต้องพูดถึงรูป)
-- ถ้าลูกค้าถามรายละเอียดโปรที่ไม่รู้: ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
-- ถ้าลูกค้าบอกว่าจะมากิน/อยากมาทาน: ถามว่าจะจองโต๊ะไว้ก่อนมั้ยคะ
-- ถ้าถามส่งบ้าน: ทางร้านไม่มีบริการส่ง แนะนำ Grab Food หรือให้มารับได้เลยค่ะ
-- ถ้าไม่รู้/ไม่มีข้อมูล: บอกว่าไม่แน่ใจค่ะ แล้วให้โทรถามได้เลยที่ 052-005-581 หรือ 081-751-4044 นะคะ
-- ถ้าลูกค้าถามว่า วันนี้เปิดมั้ย,ไหม ให้ตอบไปว่า ร้านเปิดทุกวัน 11.00-22.00 หยุดวันจันทร์ ห้ามถามลูกค้ากลับว่าวันนี้วันอะไรให้ลูกค้าตอบ
-- ห้ามให้เบอร์โทรร้านโดยเด็ดขาด ยกเว้นลูกค้าถามเองว่าโทรได้มั้ย หรือเข้ากรณีไม่รู้จริงๆ หรือกรณีถามรายละเอียดโปรเพิ่มเติม
-- ตอบภาษาเดียวกับที่ลูกค้าใช้ ถ้าลูกค้าพิมไทยตอบไทย ถ้าพิมอังกฤษตอบอังกฤษ
-- ถ้าถามห้องส่วนตัว/ห้อง VIP/ห้องชั้น 2: ตอบว่ามีค่ะ อยู่ชั้น 2 นั่งได้ 6-8 ท่าน แล้วถามว่า "จองไว้ก่อนได้เลยนะคะ มากี่ท่านคะ?"
-
-ข้อมูลโปรโมชั่น PREMIUM SET:
-{PROMO_DETAIL}
-
-ข้อมูลร้าน:
-{KNOWLEDGE_BASE}
-"""
-
-BOOKING_PROMPT = f"""คุณคือแอดมินร้าน "มัจฉา ปลาจุ่ม" รับสั่งอาหารล่วงหน้าและจองโต๊ะผ่าน Facebook
-
-ข้อมูลที่ต้องแม่นยำ 100%:
-- เวลาเปิด: 11:00-22:00 น. ทุกวัน (ยกเว้นวันจันทร์หยุด)
-- ห้ามตอบเวลาอื่นโดยเด็ดขาด ไม่ว่ากรณีใดๆ
-
-ข้อมูลสำคัญ:
-- ไม่มีบริการส่งถึงบ้าน ถ้าลูกค้าอยากให้ส่งแนะนำ Grab Food มารับได้เลย หรือสั่งแล้วเข้ามารับเองก็ได้ค่ะ
-- มัดจำเฉพาะสั่งล่วงหน้าและยอดเกิน 1,000 บาทเท่านั้น
-- โปรวันเกิด: ลด 10% ต้องแจ้งล่วงหน้าและแสดงหลักฐานวันเกิด
-- ถ้ามีโปร ให้หัก 10% ก่อนคำนวณยอดรวมเสมอ
-- ลูกค้าสามารถนำเครื่องดื่นแอลกอฮอเข้ามาได้ เบียร์ ไวน์ เหล้า นำเข้ามาได้ไม่เสียค่าเปิดขวด ฟรี
-- ถ้าลูกค้าถามรายละเอียดโปรที่ไม่รู้: ตอบว่า "รายละเอียดเพิ่มเติมสามารถโทร 081-7514044 ได้นะคะ"
+# กฎหลักของบอท — เนื้อหาร้าน/เมนู/โปร/วิธีตอบ มาจาก Google Sheet (ดู content.py)
+BASE_RULES = """คุณคือแอดมินร้าน "มัจฉา ปลาจุ่ม" ตอบแชท Facebook แบบคนพิมจริงๆ รับคำถามทั่วไป จองโต๊ะ และสั่งอาหารล่วงหน้า
 
 กฎการเขียน:
-- ถ้าแสดงรายการเมนู: ใช้ • นำหน้าแต่ละรายการ ขึ้นบรรทัดใหม่ทีละเมนู
-- พิมสั้น เป็นกันเอง emoji 1 ตัว ห้ามใช้ **bold**
-- ห้ามบอกให้โทรยืนยัน ห้ามบอกเบอร์โทรร้าน ยกเว้นถามรายละเอียดโปรเพิ่มเติม
-- ถ้าไม่บอกวัน = วันนี้ ห้ามถามวันซ้ำ
-- ตอบภาษาเดียวกับที่ลูกค้าใช้ ถ้าลูกค้าพิมไทยตอบไทย ถ้าพิมอังกฤษตอบอังกฤษ    
+- ตอบสั้น 1-2 ประโยค
+- ถ้าแสดงรายการเมนู: ใช้ • นำหน้าแต่ละรายการ ขึ้นบรรทัดใหม่ทีละเมนู ลงท้ายด้วย link เมนู
+- ลงท้าย ค่ะ หรือ นะคะ ห้ามใช้ **bold**
+- emoji ไม่ต้องมีทุกข้อความ ใส่บางข้อความพอ ครั้งละไม่เกิน 1 ตัว และห้ามใช้ตัวเดิมซ้ำกับข้อความก่อนหน้า
+- การชวนจองโต๊ะ: ทำตาม "คำสั่งเรื่องชวนจอง" ท้าย prompt ว่าข้อความนี้ชวนได้หรือไม่ (ใช้กับประโยคชวนจองใน "วิธีตอบ" ด้วย)
+- ตอบภาษาเดียวกับที่ลูกค้าใช้ ถ้าลูกค้าพิมไทยตอบไทย ถ้าพิมอังกฤษตอบอังกฤษ
+- ห้ามให้เบอร์โทรร้าน ห้ามบอกให้โทรยืนยัน ยกเว้นลูกค้าถามเองว่าโทรได้มั้ย หรือไม่รู้คำตอบจริงๆ หรือถามรายละเอียดโปรเพิ่มเติม
+- ถ้าไม่รู้/ไม่มีข้อมูล: บอกว่าไม่แน่ใจค่ะ แล้วให้โทรถามที่เบอร์ร้าน
+- โปรโมชั่น: พูดถึงได้เฉพาะโปรใน "โปรโมชั่นที่ใช้ได้ตอนนี้" เท่านั้น ถ้าไม่มี บอกว่าช่วงนี้ยังไม่มีโปรพิเศษค่ะ
+- ถ้าลูกค้าเข้าเงื่อนไขโปรที่เป็นส่วนลด ให้หักส่วนลดก่อนคำนวณยอดรวมเสมอ
+- เมนูที่ "หมด" ห้ามรับออเดอร์ บอกลูกค้าว่าวันนี้หมดแล้วและแนะนำเมนูอื่น
+- ถ้าลูกค้าไม่บอกวัน = วันนี้ ห้ามถามวันซ้ำ ถ้าวันที่ลูกค้าจะมาเป็นวันหยุดร้าน ให้แจ้งลูกค้า
 
 == กรณีสั่งอาหารล่วงหน้า ==
 ขั้น 1: รับรายการเมนู
 ขั้น 2: คำนวณราคารวมในใจทันที
 ขั้น 3: ถามเวลา (ถ้าบอกแล้ว ข้าม ถ้าไม่บอกวัน = วันนี้)
 ขั้น 4 (ห้ามข้าม): เช็กยอดรวม
-  - ยอด > 1,000: ถาม "มัดจำก่อนครึ่งนึงได้เลยนะคะ ถ้าใกล้ถึงเวลาจะทำให้ก่อนเลยค่ะ" รอคำตอบ
+  - ยอด > {deposit_min}: ถาม "มัดจำก่อนครึ่งนึงได้เลยนะคะ ถ้าใกล้ถึงเวลาจะทำให้ก่อนเลยค่ะ" รอคำตอบ
     * ตกลง: คำนวณ ยอดรวม ÷ 2 ปัดขึ้น (เช่น 1326÷2=663, 1469÷2=735) บอก "ครึ่งนึงคือ X บาทนะคะ เดี๋ยวส่ง QR ให้ทาง chat นะคะ" ปิดด้วย [BOOKING_COMPLETE_DEPOSIT]
     * ไม่มัดจำ: ถามชื่อและเบอร์ → ปิดด้วย [BOOKING_COMPLETE]
-  - ยอด ≤ 1,000: ถามชื่อและเบอร์ → ปิดด้วย [BOOKING_COMPLETE]
-  (ห้ามพูดถึงมัดจำเลยถ้ายอดไม่ถึง 1,000)
+  - ยอด ≤ {deposit_min}: ถามชื่อและเบอร์ → ปิดด้วย [BOOKING_COMPLETE]
+  (ห้ามพูดถึงมัดจำเลยถ้ายอดไม่ถึง {deposit_min})
 ขั้น 5: ปิดด้วย tag เสมอ ห้ามปิดโดยไม่ผ่านขั้น 4
 
 == กรณีจองโต๊ะ ==
@@ -298,54 +69,105 @@ BOOKING_PROMPT = f"""คุณคือแอดมินร้าน "มัจ
 ขั้น 2: กี่ท่าน (ถ้าบอกแล้ว ข้าม)
 ขั้น 3: ขอชื่อและเบอร์ ปิดด้วย [BOOKING_COMPLETE]
 
-ข้อมูลโปรโมชั่น PREMIUM SET:
-{PROMO_DETAIL}
-
-ราคาเมนูทั้งหมด:
-{MENU_FULL}
-
-ข้อมูลร้าน:
-{KNOWLEDGE_BASE}
+ใช้ tag [BOOKING_COMPLETE] / [BOOKING_COMPLETE_DEPOSIT] เฉพาะตอนได้ข้อมูลจองหรือออเดอร์ครบแล้วเท่านั้น
 """
 
-# ========== SESSION ==========
-SESSION_TTL = 2 * 60 * 60
+THAI_DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์']
+THAI_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+               'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
+
+def build_system_prompt(invite_booking=True):
+    """สร้าง system prompt จากข้อมูลในชีต — ส่วนที่ไม่เปลี่ยนบ่อยอยู่ก่อน (cache ได้) วันเวลาอยู่ท้ายสุด"""
+    data = content.get()
+    now = content.now_bkk()
+    today = now.date()
+
+    info_lines = [f"{r['หัวข้อ']}: {r.get('รายละเอียด', '')}" for r in data["info"] if r.get("หัวข้อ")]
+
+    menu_lines, last_cat = [], None
+    for m in data["menu"]:
+        name = m.get("ชื่อเมนู")
+        if not name:
+            continue
+        cat = m.get("หมวด", "")
+        if cat and cat != last_cat:
+            menu_lines.append(f"[{cat}]")
+            last_cat = cat
+        line = f"{name} {m.get('ราคา', '')}"
+        if content.is_true(m.get("แนะนำ")):
+            line += " ★แนะนำ"
+        if not content.is_true(m.get("มีขาย"), blank=True):
+            line += " (หมด)"
+        if m.get("หมายเหตุ"):
+            line += f" — {m['หมายเหตุ']}"
+        menu_lines.append(line)
+
+    faq_lines = [f"- ถ้า{r['เมื่อลูกค้าถาม']}: {r.get('ให้ตอบ', '')}"
+                 for r in data["faq"] if r.get("เมื่อลูกค้าถาม")]
+
+    deposit_min = content.info_value(data, "มัดจำเมื่อยอดเกิน", "1000").replace(",", "")
+    stable = BASE_RULES.replace("{deposit_min}", f"{int(deposit_min):,}" if deposit_min.isdigit() else deposit_min)
+    stable += "\nวิธีตอบเมื่อลูกค้าถามเรื่องต่างๆ:\n" + "\n".join(faq_lines)
+    stable += "\n\nข้อมูลร้าน:\n" + "\n".join(info_lines)
+    stable += "\n\nเมนูและราคา (บาท):\n" + "\n".join(menu_lines)
+
+    promo_lines = []
+    for p in data["promos"]:
+        if content.promo_status(p, today) != "active":
+            continue
+        line = f"- {p.get('ชื่อโปร', '')}: {p.get('รายละเอียด', '')}"
+        start, end = content.parse_date(p.get("วันเริ่ม")), content.parse_date(p.get("วันสิ้นสุด"))
+        if start or end:
+            line += f" (ใช้ได้ {start.strftime('%d/%m/%Y') if start else ''} ถึง {end.strftime('%d/%m/%Y') if end else 'ไม่มีกำหนด'})"
+        promo_lines.append(line)
+
+    dynamic = (
+        f"วันนี้: วัน{THAI_DAYS[today.weekday()]}ที่ {today.day} {THAI_MONTHS[today.month - 1]} {today.year} "
+        f"เวลา {now.strftime('%H:%M')} น. (เวลาไทย)\n\n"
+        "โปรโมชั่นที่ใช้ได้ตอนนี้:\n" + ("\n".join(promo_lines) if promo_lines else "(ไม่มี)") + "\n\n"
+        "คำสั่งเรื่องชวนจอง: " + (
+            "ข้อความนี้ชวนจองโต๊ะได้ (ถ้าลูกค้ากำลังจองอยู่ ให้ทำขั้นตอนจองต่อแทน)" if invite_booking else
+            "ข้อความนี้ห้ามชวนจองโต๊ะ ตอบแค่คำถาม (ถ้าลูกค้ากำลังจองอยู่ ให้ทำขั้นตอนจองต่อตามปกติ)")
+    )
+
+    return [
+        {"type": "text", "text": stable, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": dynamic},
+    ]
+
+# Session storage พร้อม TTL 24 ชม. — ป้องกัน memory leak
+SESSION_TTL = 24 * 60 * 60  # 24 hours in seconds
 user_sessions = {}
-
-BOOKING_KEYWORDS = [
-    'จอง','จองโต๊ะ','จองที่','book','reserve','ขอจอง','อยากจอง',
-    'สั่งล่วงหน้า','สั่งอาหารล่วงหน้า','preorder','pre-order','ล่วงหน้า',
-    'อยากมากิน','อยากเข้าไปกิน','จะมากิน','จะไปกิน','อยากไปกิน',
-    'มาทาน','ไปทาน','อยากมาทาน','จะมาทาน',
-    'สั่งชุด','สั่ง','ขอสั่ง','อยากสั่ง',
-]
-
-def is_booking_intent(text):
-    return any(k in text for k in BOOKING_KEYWORDS)
-
-def is_promo_intent(text):
-    return any(k in text for k in PROMO_KEYWORDS)
+sessions_lock = threading.Lock()
 
 def get_session(user_id):
+    """ดึง session และ clean up sessions เก่าที่หมดอายุ"""
     now = time.time()
-    expired = [uid for uid, s in user_sessions.items() if now - s.get("last_active", 0) > SESSION_TTL]
-    for uid in expired:
-        del user_sessions[uid]
-    if user_id not in user_sessions:
-        user_sessions[user_id] = {"history": [], "booking_mode": False, "last_active": now}
-    else:
-        user_sessions[user_id]["last_active"] = now
-    return user_sessions[user_id]
 
-# ========== TELEGRAM ==========
-def send_telegram(message):
+    with sessions_lock:
+        # Clean up expired sessions ทุกครั้งที่มี request
+        expired = [uid for uid, s in user_sessions.items() if now - s.get("last_active", 0) > SESSION_TTL]
+        for uid in expired:
+            del user_sessions[uid]
+
+        if user_id not in user_sessions:
+            user_sessions[user_id] = {
+                "history": [],
+                "last_active": now,
+                "lock": threading.Lock(),  # กันข้อความของลูกค้าคนเดียวกันตอบสลับกัน
+            }
+        else:
+            user_sessions[user_id]["last_active"] = now
+
+        return user_sessions[user_id]
+
+def send_telegram(message, parse_mode="HTML"):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     try:
-        resp = requests.post(url, json={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        }, timeout=5)
+        resp = requests.post(url, json=payload, timeout=5)
         if not resp.ok:
             print(f"Telegram error: {resp.status_code} {resp.text}")
     except Exception as e:
@@ -356,30 +178,36 @@ def build_telegram_summary(history, is_deposit):
     for i, m in enumerate(history):
         t = m['content']
 
+        # เวลา
         tm = re.search(r'(\d{1,2})\s*(?:โมง|นาฬิกา|:[0-5]\d)', t)
         if tm and not time_val:
             time_val = tm.group(0).strip()
 
+        # เบอร์ (จาก user)
         if m['role'] == 'user':
             ph = re.search(r'0\d[\d\s\-]{8,10}', t)
             if ph and not phone:
                 phone = re.sub(r'[\s\-]', '', ph.group(0))[:10]
 
+        # จำนวนคน
         px = re.search(r'(\d+)\s*(?:ท่าน|คน)', t)
         if px and not pax:
             pax = px.group(1) + ' ท่าน'
 
+        # ยอดรวม — จับหลาย pattern
         tot = re.search(r'(?:รวม|ยอด|ทั้งหมด|คิดเป็น)\D{0,8}([1-9][\d,]{2,})\s*บาท', t)
         if not tot:
-            tot = re.search(r'([1-9][\d,]{3,})\s*บาท', t)
+            tot = re.search(r'([1-9][\d,]{3,})\s*บาท', t)  # ตัวเลข 4+ หลัก
         if tot and not total:
             total = tot.group(1).replace(',', '') + ' บาท'
 
+        # มัดจำ
         dep = re.search(r'ครึ่งนึงคือ\s*([\d,.]+)\s*บาท', t)
         if dep and not deposit:
             d = math.ceil(float(dep.group(1).replace(',', '')))
             deposit = str(d) + ' บาท'
 
+        # ชื่อ — ดูจาก user ที่ตอบหลัง bot ถามชื่อ/เบอร์
         if m['role'] == 'assistant' and any(w in t for w in ['ขอชื่อ','ชื่อและเบอร์','ชื่อ-เบอร์','แจ้งชื่อ']):
             if i + 1 < len(history) and history[i + 1]['role'] == 'user':
                 ans = history[i + 1]['content'].strip()
@@ -391,9 +219,10 @@ def build_telegram_summary(history, is_deposit):
                 if ph2 and not phone:
                     phone = re.sub(r'[\s\-]', '', ph2.group(0))[:10]
 
+        # เมนู (จาก bot message ที่มี |)
         if m['role'] == 'assistant' and not items:
             pipe = re.search(
-                r'[\u0E00-\u0E7Fa-zA-Z][\u0E00-\u0E7Fa-zA-Z\s]+\d+(?:\s*\|\s*[\u0E00-\u0E7Fa-zA-Z][\u0E00-\u0E7Fa-zA-Z\s]+\d+){1,}',
+                r'[฀-๿a-zA-Z][฀-๿a-zA-Z\s]+\d+(?:\s*\|\s*[฀-๿a-zA-Z][฀-๿a-zA-Z\s]+\d+){1,}',
                 t
             )
             if pipe:
@@ -415,9 +244,8 @@ def build_telegram_summary(history, is_deposit):
 
     return '\n'.join(lines)
 
-# ========== FACEBOOK ==========
 def send_message_fb(recipient_id, text):
-    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    url = f"https://graph.facebook.com/{GRAPH_API}/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     try:
         resp = requests.post(url, json={
             "recipient": {"id": recipient_id},
@@ -428,66 +256,70 @@ def send_message_fb(recipient_id, text):
     except Exception as e:
         print(f"FB send exception: {e}")
 
+# ถ้าลูกค้าถามเรื่องโปร ส่งรูปโปรทาง DM ก่อนข้อความ (คอมเมนต์ส่งรูปไม่ได้)
+PROMO_IMAGE_URL = "https://i.ibb.co/MkLtBJ6g/Screenshot-2026-05-15-at-11-40-05-AM.png"
+PROMO_KEYWORDS = [
+    'โปร', 'โปรโมชั่น', 'promotion', 'set', 'เซ็ต', 'ชุด', 'premium', 'พรีเมียม',
+    'ส่วนลด', 'discount', 'ราคาพิเศษ', '999', '1199', '1990', 'คนละครึ่ง', 'ไทยช่วยไทย'
+]
+
 def send_image_fb(recipient_id, image_url):
-    url = f"https://graph.facebook.com/v18.0/me/messages?access_token={PAGE_ACCESS_TOKEN}"
+    url = f"https://graph.facebook.com/{GRAPH_API}/me/messages?access_token={PAGE_ACCESS_TOKEN}"
     try:
         resp = requests.post(url, json={
             "recipient": {"id": recipient_id},
-            "message": {
-                "attachment": {
-                    "type": "image",
-                    "payload": {
-                        "url": image_url,
-                        "is_reusable": True
-                    }
-                }
-            }
+            "message": {"attachment": {"type": "image", "payload": {"url": image_url, "is_reusable": True}}}
         }, timeout=5)
         if not resp.ok:
             print(f"FB image send error: {resp.status_code} {resp.text}")
     except Exception as e:
         print(f"FB image send exception: {e}")
 
-# ========== AI REPLY ==========
+ERROR_REPLY ="ขออภัยค่ะ ตอนนี้ร้านยุ่งมาก ไม่สะดวกตอบแชทจริงๆ รบกวนโทร 081-751-4044 นะคะ 🙏"
+
 def get_ai_reply(user_id, user_text):
     session = get_session(user_id)
 
-    # ส่งรูปโปรก่อนเลย ถ้า detect ได้ — แยก DM กับ comment (comment ส่งรูปไม่ได้)
-    send_promo_image = is_promo_intent(user_text) and not user_id.startswith("comment_")
+    with session["lock"]:
+        history = session["history"] + [{"role": "user", "content": user_text}]
 
-    if not session["booking_mode"] and is_booking_intent(user_text):
-        session["booking_mode"] = True
+        # ชวนจองในคำตอบที่ 1, 4, 7, ... และเลิกชวนเมื่อจองเสร็จแล้ว
+        past_replies = [m["content"] for m in session["history"] if m["role"] == "assistant"]
+        booked = any("[BOOKING_COMPLETE" in r for r in past_replies)
+        invite = not booked and len(past_replies) % 3 == 0
 
-    session["history"].append({"role": "user", "content": user_text})
-    system_prompt = BOOKING_PROMPT if session["booking_mode"] else GENERAL_PROMPT
+        try:
+            response = client.beta.messages.create(
+                model=MODEL,
+                max_tokens=4000,
+                system=build_system_prompt(invite),
+                messages=history[-20:],
+                output_config={"effort": "low"},
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+        except Exception as e:
+            print(f"Claude API error: {e}")
+            return ERROR_REPLY
 
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=400,
-            system=system_prompt,
-            messages=session["history"][-20:]
-        )
-        reply = response.content[0].text
-    except Exception as e:
-        print(f"Claude API error: {e}")
-        return None, "ขอโทษนะคะ ตอนนี้ยังไม่สะดวกพิมตอบ โทร 081-7514044 ก่อนนะคะ 🙏"
+        reply = "".join(b.text for b in response.content if b.type == "text").strip()
+        if response.stop_reason == "refusal" or not reply:
+            print(f"Claude no reply: stop_reason={response.stop_reason}")
+            return ERROR_REPLY
 
-    session["history"].append({"role": "assistant", "content": reply})
+        # เก็บ history หลังได้คำตอบแล้วเท่านั้น — ไม่ให้ user ต่อกัน 2 ข้อความถ้า API ล่ม
+        history.append({"role": "assistant", "content": reply})
+        session["history"] = history
 
+    # ตรวจ booking complete
     is_deposit = '[BOOKING_COMPLETE_DEPOSIT]' in reply
     is_complete = '[BOOKING_COMPLETE]' in reply or is_deposit
 
-    if is_complete and session["booking_mode"]:
-        clean_reply = reply.replace('[BOOKING_COMPLETE_DEPOSIT]', '').replace('[BOOKING_COMPLETE]', '').strip()
-        summary = build_telegram_summary(session["history"], is_deposit)
-        send_telegram(summary)
-        session["booking_mode"] = False
-        return send_promo_image, clean_reply
+    if is_complete:
+        send_telegram(build_telegram_summary(history, is_deposit))
 
-    return send_promo_image, reply
+    return reply.replace('[BOOKING_COMPLETE_DEPOSIT]', '').replace('[BOOKING_COMPLETE]', '').strip()
 
-# ========== WEBHOOK ==========
 @app.route('/webhook', methods=['GET'])
 def verify():
     if request.args.get('hub.verify_token') == VERIFY_TOKEN:
@@ -495,7 +327,7 @@ def verify():
     return 'Forbidden', 403
 
 def reply_to_comment(comment_id, message):
-    url = f"https://graph.facebook.com/v18.0/{comment_id}/comments"
+    url = f"https://graph.facebook.com/{GRAPH_API}/{comment_id}/comments"
     try:
         resp = requests.post(url, json={
             "message": message,
@@ -506,8 +338,28 @@ def reply_to_comment(comment_id, message):
     except Exception as e:
         print(f"Comment reply exception: {e}")
 
+def handle_dm(sender_id, user_text):
+    try:
+        reply = get_ai_reply(sender_id, user_text)
+        if reply != ERROR_REPLY and any(k in user_text.lower() for k in PROMO_KEYWORDS):
+            send_image_fb(sender_id, PROMO_IMAGE_URL)
+        send_message_fb(sender_id, reply)
+    except Exception as e:
+        print(f"Event processing error: {e}")
+
+def handle_comment(commenter_id, comment_id, comment_text):
+    try:
+        reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
+        reply_to_comment(comment_id, reply)
+    except Exception as e:
+        print(f"Comment processing error: {e}")
+
+def run_in_background(fn, *args):
+    threading.Thread(target=fn, args=args, daemon=True).start()
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    # ตอบ Facebook 200 ทันที แล้วค่อยให้ AI ตอบใน background — ถ้าช้า Facebook จะส่งข้อความซ้ำ
     try:
         data = request.json
         if not data:
@@ -516,50 +368,70 @@ def webhook():
         for entry in data.get('entry', []):
             # handle DM
             for event in entry.get('messaging', []):
-                try:
-                    sender_id = event.get('sender', {}).get('id')
-                    if not sender_id:
-                        continue
-                    msg = event.get('message', {})
-                    if not msg or msg.get('is_echo'):
-                        continue
-                    user_text = msg.get('text', '').strip()
-                    if not user_text:
-                        continue
-                    should_send_image, reply = get_ai_reply(sender_id, user_text)
-                    if should_send_image:
-                        send_image_fb(sender_id, PROMO_IMAGE_URL)
-                    send_message_fb(sender_id, reply)
-                except Exception as e:
-                    print(f"Event processing error: {e}")
+                sender_id = event.get('sender', {}).get('id')
+                if not sender_id:
                     continue
+                msg = event.get('message', {})
+                if not msg or msg.get('is_echo'):
+                    continue
+                user_text = msg.get('text', '').strip()
+                if not user_text:
+                    continue
+                run_in_background(handle_dm, sender_id, user_text)
 
             # handle comments
             for change in entry.get('changes', []):
-                try:
-                    value = change.get('value', {})
-                    if change.get('field') != 'feed':
-                        continue
-                    if value.get('item') != 'comment':
-                        continue
-                    if value.get('verb') != 'add':
-                        continue
-                    if value.get('from', {}).get('id') == entry.get('id'):
-                        continue
-                    comment_id = value.get('comment_id')
-                    comment_text = value.get('message', '').strip()
-                    commenter_id = value.get('from', {}).get('id', 'unknown')
-                    if not comment_id or not comment_text:
-                        continue
-                    _, reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
-                    reply_to_comment(comment_id, reply)
-                except Exception as e:
-                    print(f"Comment processing error: {e}")
+                value = change.get('value', {})
+                if change.get('field') != 'feed':
                     continue
+                if value.get('item') != 'comment':
+                    continue
+                if value.get('verb') != 'add':
+                    continue
+                # ข้าม comment ของเพจเอง
+                if value.get('from', {}).get('id') == entry.get('id'):
+                    continue
+                comment_id = value.get('comment_id')
+                comment_text = value.get('message', '').strip()
+                commenter_id = value.get('from', {}).get('id', 'unknown')
+                if not comment_id or not comment_text:
+                    continue
+                run_in_background(handle_comment, commenter_id, comment_id, comment_text)
 
     except Exception as e:
         print(f"Webhook error: {e}")
 
+    return 'OK', 200
+
+TELEGRAM_HELP = (
+    "คำสั่งบอทมัจฉา:\n"
+    "/reload — ดึงข้อมูลจาก Google Sheet ใหม่ทันที\n"
+    "/status — ดูว่าตอนนี้บอทเห็นโปร/เมนูอะไรบ้าง"
+)
+
+@app.route('/telegram', methods=['POST'])
+def telegram_webhook():
+    if TELEGRAM_WEBHOOK_SECRET and \
+            request.headers.get('X-Telegram-Bot-Api-Secret-Token') != TELEGRAM_WEBHOOK_SECRET:
+        return 'Forbidden', 403
+    try:
+        msg = (request.json or {}).get('message') or {}
+        # รับคำสั่งเฉพาะจากแชทของร้านเท่านั้น
+        if str(msg.get('chat', {}).get('id')) != str(TELEGRAM_CHAT_ID):
+            return 'OK', 200
+        command = (msg.get('text') or '').strip().split()[0:1]
+        command = command[0].split('@')[0].lower() if command else ''
+
+        if command == '/reload':
+            ok, note = content.reload(force=True)
+            # ถ้าไม่สำเร็จ status_text() แสดงสาเหตุให้แล้ว
+            send_telegram((f"✅ {note}\n\n" if ok else "") + content.status_text(), parse_mode=None)
+        elif command == '/status':
+            send_telegram(content.status_text(), parse_mode=None)
+        elif command in ('/help', '/start'):
+            send_telegram(TELEGRAM_HELP, parse_mode=None)
+    except Exception as e:
+        print(f"Telegram webhook error: {e}")
     return 'OK', 200
 
 @app.route('/health', methods=['GET'])
