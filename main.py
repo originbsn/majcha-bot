@@ -353,6 +353,49 @@ def handle_dm(sender_id, user_text):
     except Exception as e:
         print(f"Event processing error: {e}")
 
+# ทักกลับคนที่ถามแล้วเงียบไป — ครั้งเดียวต่อคน ภายในหน้าต่าง 24 ชม. ของ Messenger
+# ตั้งค่าในชีต แท็บข้อมูลร้าน: ทักกลับอัตโนมัติ / ทักกลับหลัง (ชั่วโมง) / ข้อความทักกลับ
+DEFAULT_FOLLOWUP = "วันนี้ยังมีโต๊ะว่างอยู่นะคะ จองผ่านแชทรับเฟรนช์ฟรายส์ฟรี 1 จานค่ะ มากี่ท่านคะ 😊"
+
+def followup_due(user_id, session, now, after_seconds):
+    if user_id.startswith("comment_") or session.get("followup_sent"):
+        return False
+    history = session["history"]
+    if not history or history[-1]["role"] != "assistant":
+        return False
+    if any("[BOOKING_COMPLETE" in m["content"] for m in history if m["role"] == "assistant"):
+        return False
+    quiet = now - session["last_active"]
+    return after_seconds <= quiet < 23 * 60 * 60
+
+def followup_loop():
+    while True:
+        time.sleep(300)
+        try:
+            data = content.get()
+            if not content.is_true(content.info_value(data, "ทักกลับอัตโนมัติ", "เปิด")):
+                continue
+            bkk = content.now_bkk()
+            if bkk.weekday() == 0 or not (10 <= bkk.hour < 20):  # ร้านหยุดวันจันทร์ / ไม่ทักนอกเวลา
+                continue
+            after = float(content.info_value(data, "ทักกลับหลัง (ชั่วโมง)", "2")) * 3600
+            text = content.info_value(data, "ข้อความทักกลับ", DEFAULT_FOLLOWUP)
+            now = time.time()
+            with sessions_lock:
+                items = list(user_sessions.items())
+            for user_id, session in items:
+                with session["lock"]:
+                    if not followup_due(user_id, session, now, after):
+                        continue
+                    session["followup_sent"] = True
+                    session["history"][-1]["content"] += "\n\n" + text
+                send_message_fb(user_id, text)
+                print(f"Follow-up sent to {user_id}")
+        except Exception as e:
+            print(f"Follow-up error: {e}")
+
+threading.Thread(target=followup_loop, daemon=True).start()
+
 def handle_comment(commenter_id, comment_id, comment_text):
     try:
         reply = get_ai_reply(f"comment_{commenter_id}", comment_text)
